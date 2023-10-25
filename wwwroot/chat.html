@@ -1,0 +1,256 @@
+<html>
+	<head>
+		<title>Websocket Chat demo</title>
+		<meta charset="utf-8"/>
+		<script type="text/javascript">
+			var ws, nickname;
+			var ws_error = false;
+			var page = {};
+
+			function openWS() {
+				portStr = window.location.port ? ":" + window.location.port : "";
+				srvString = "ws://" + window.location.hostname + portStr + window.location.pathname;
+				ws = new WebSocket(srvString);
+				ws.binaryType = "arraybuffer";
+				ws.onmessage = function(e) {
+					var recv = JSON.parse(e.data);
+					if( ("cmd" in recv ) && ("msg" in recv ) ){
+						if(recv.cmd == "msg" ){
+							addChatEntry(recv.msg, recv.from);
+						} else if(recv.cmd == "login" ){
+							addChatEntry(recv.msg);
+							showLogin();
+						} else if(recv.cmd == "nickname"){
+							nickname = recv.msg;
+							hideLogin();
+						} else if(recv.cmd == "list" ){
+							page.nickDiv.style.display = "block";
+							page.nickList.innerHTML = recv.msg.replace(", ", "<br>");
+						} else if(recv.cmd == "error" ){
+							addChatEntry(recv.msg);
+							ws_error = true;					
+						} else {
+							addChatEntry("debug:" + e.data);
+						}
+					} else {
+						//alert("error!"); //alert(e.data.length);			
+						addChatEntry("debug:" + e.data);
+					}
+				};
+
+				ws.onclose = function(e) {
+					if(!ws_error) openWS();
+				};
+			}	
+
+			function ws_send(cmdStr, msgStr) {
+				//Prepare json with the data to send
+				var data = { cmd: cmdStr, msg: msgStr };
+				jsonData = JSON.stringify(data);
+				ws.send(jsonData);//Test for unicode ÆØÅ おはよう 結婚猫 Université de Montréal привет æøå päivitän
+			}
+
+
+			function send_msg() {
+				var msgStr = page.messageInput.value;
+				if(msgStr) {
+					ws_send("msg", msgStr);
+					page.messageInput.value = "";
+				}
+			}
+
+			function send_nick() {
+				var requestNick = page.nickInput.value; 
+				if (requestNick){
+					ws_send("login", requestNick);
+				} else alert("no nickname");
+			}
+			
+			function showLogin(){
+				[page.loginDiv.style.display, page.opacityDiv.style.display, page.outerContainer.style.webkitFilter]  = ["block", "block", "blur(1px)"];
+				page.nickInput.focus();
+			}
+
+			function hideLogin(){
+				[page.loginDiv.style.display, page.opacityDiv.style.display, page.outerContainer.style.webkitFilter] = ["none", "none", "blur(0px)"];
+				page.messageInput.focus();
+			}
+
+			function addChatEntry(message,sender="[SERVER]"){
+				if(sender != "[SERVER]") sender = "<" + sender + ">";
+				page.outputDiv.value += sender + " " + message + "\n";
+				page.outputDiv.scrollTop = page.outputDiv.scrollHeight;
+			}
+			
+			function toggleNickList(){
+				nickDiv.style.height = nickDiv.offsetHeight > 100 ? "30px" : "calc(100vh - 60px)";
+			}
+
+			function dotify(elementId){
+				page[elementId] = document.getElementById(elementId);
+				// Assigns element to dict page --> page.nickInput, page.loginDiv
+			}
+			
+			window.onload = function() {
+				pageElements = ["outputDiv", "loginDiv", "opacityDiv", "outerContainer", "nickInput", "messageInput", "nickDiv", "nickList"];
+				pageElements.forEach(dotify); //too lazy to type document.getElementById for each of them..
+				if("WebSocket" in window) {
+					addChatEntry("CONNECTING");
+					openWS();
+				} else {
+					addChatEntry("WebSocket is NOT supported by your browser!");
+				}
+			}
+
+			
+			
+			/* 
+			Absolutely NO NEED to add base64 encoding in addition to the native 
+			websocket encoding built in to the browser. However, an extra layer of encryption needs b64 wrapping..?
+
+			function b64enc(inputStr){
+				return window.btoa(inputStr);
+			}
+
+			function b64dec(inputStr){
+				return window.atob(inputStr);
+			}*/
+
+		</script>
+
+		<style>
+			body {
+				height: 100vh;
+				width: 100vw;
+				background-color: #000;
+				color: #FFF;
+				margin: 0px;
+			}
+
+			#opacityDiv {
+				opacity: 0;
+				position: fixed;
+				top: 0px;
+				left: 0px;
+				height: 100vh;
+				width: 100vw;
+				background-color: green;
+				display: block;
+				z-index: 2
+			}
+
+
+			#outerContainer {
+				height: 100vh;
+				width: 100vw;
+				background-color: #585858;
+				display: block;
+			}
+
+			#loginDiv {
+				position: fixed;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				height: 100px;
+				width: 400px;
+				background-color: #585858;
+				color: #FFF;
+				display: none;
+				border: 3px solid grey;
+				border-radius: 5px;
+				box-shadow:9px 15px 15px 9px grey;
+				padding: 10px;
+				z-index: 3;
+			}
+
+			#nickDiv {
+				position: fixed;
+				top: 0px;
+				right: 20px;
+				height: 30px;
+				width: 100px;
+				color: #FFF;
+				display: none;
+				border: 3px solid grey;
+				border-radius: 5px;
+				box-shadow:1px 1px 1px 1px grey;
+				background-color: #606060;
+				padding-top: 2px;
+				padding-left: 5px;
+				padding-right: 5px;
+				padding-bottom: 0px;
+				z-index: 2;
+				overflow: hidden;
+			}
+			#nickDivHeader {
+				font-size: 18;
+				padding-bottom: 10px;
+			}
+
+			#outputDiv {
+				height: calc(100vh - 30px);
+				width: 100vw;
+				background-color: #585858;
+				color: #FFF;
+				display: block;
+				overflow-x: hidden;
+				overflow-y: scroll;
+				font-family: Arial;
+				font-size: 14;
+			}
+
+			#messageInput {
+				height: 25px;
+				width: calc(100vw - 65px);
+				display: block;
+				overflow: auto; 
+				font-family: Arial
+				margin: 0px;
+				margin-left:2px;
+			}
+
+			#input_area {
+				display: inline-block;
+
+			}
+			.input {
+				display: inline-block;
+				vertical-align: top;
+
+			}
+			#sendBtn {
+				display: block;
+				height: 25px;
+				width: 60px;
+			}
+			#nickDivBtn {
+				float: right;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="loginDiv" onclick="nickInput.focus();">Login
+			<input id="nickInput" type="text" placeholder="Your nickname" style="display: block; width: 200px" onkeydown='if(event.which === 13) send_nick();'></input>
+			<button onclick="send_nick();">Log in</button>	
+		</div>
+
+		<div id="nickDiv">
+			<div id="nickDivHeader">Users: <div id="nickDivBtn" onclick="toggleNickList();">&#9776;</div></div>
+			<div id="nickList"></div>
+		</div>
+
+		<div id="outerContainer">
+			<textarea id="outputDiv" readonly></textarea>
+			<div id="input_area">
+				<div class="input">
+					<textarea id="messageInput" placeholder="Your message" onkeydown='if(event.which === 13){ event.preventDefault(); send_msg(); }' ></textarea>
+				</div><div class="input">
+					<button id="sendBtn" onclick="send_msg()">Send</button>
+				</div>
+			</div>
+		</div>
+		<div id="opacityDiv" onclick="nickInput.focus();"></div>
+	</body>
+</html>
