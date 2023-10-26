@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import traceback, time
 from importlib import reload
-import pyHttpServ
+import time, pyHttpServ
 
 server = pyHttpServ.Server()
 while True:
